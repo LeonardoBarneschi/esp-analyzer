@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import sys
+import os
+
+from grid_analysis.grid_operations import projections
+from grid_analysis.geom_operations import vdw_surface
+from grid_analysis.file_operations import pqr_scraper
+from grid_analysis.grid_operations import fit_plane
+from grid_analysis.grid_operations import rot_plane
+
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from scipy.interpolate import splprep, splev
+
+if __name__ == "__main__":
+
+    pqr = sys.argv[1]
+    out = pqr[:-3]+'xyz'
+
+    llidx = pqr_scraper.find_pqr_linker_lys(pqr)
+    coords = np.array(pqr_scraper.extract_ret_pqr(pqr,llidx)).T
+    picoords = np.array(pqr_scraper.extract_ret_pi_pqr(pqr, llidx))
+
+    surfdens = 30
+    scalefact = 1
+
+    # just for now
+    elements = ["C"]*len(coords)
+    surf = vdw_surface.vdw_surface(coords, elements, scalefact, surfdens, vdw_surface.vdw_r)[0]
+    print('--> Done with the Surface')
+
+    x, y, z = picoords
+    A, B, C, D = fit_plane.planefit_3d_points(x, y, z)
+    points = projections.surf_plane_intersection(A, B, C, D, surf)
+
+    print('points var: ', points.shape)
+    v1, v2, v3, o = rot_plane.change_basis_driver(pqr)
+
+    print('basis: ', np.array([v1,v2,v3]).T)
+
+    proj = np.matrix(points)*np.matrix([v1,v2,v3])
+    print(proj)
+    fig, ax = plt.subplots()
+
+    pts = []
+    for i in proj:
+        pts.append([i[0,1], i[0,2]])
+
+    pts = np.array(pts)
+    plt.scatter(pts[:,0], pts[:,1], c='black',alpha=1, s=1)
+
+    #plt.show()
+    #with open(out,'w') as f:
+    #    f.write("%d \n\n" % (len(points)))
+    #    np.savetxt(f, np.c_[np.ones(len(points)), points], fmt='%3d %10.6f %10.6f %10.6f')
+
+    #if os.path.exi

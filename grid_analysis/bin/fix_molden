@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
+import re
+import sys
+from collections import OrderedDict
+
+def correct_molden(molden_file, outname="new.molden", ovw=False):
+
+    atoms = []
+    chgs = []
+    gtos = OrderedDict()
+    mos = OrderedDict()
+    with open(molden_file,'r') as f:
+        for line in f:
+
+            if "[ATOMS]" in line:
+                line = next(f)
+                while len(line.split()) == 6:
+                    atoms.append(line.rstrip())
+                    line = next(f)
+
+            if "[CHARGE]" in line:
+                line = next(f)
+                while len(line.split()) == 1:
+                    chgs.append(line.rstrip())
+                    line = next(f)
+
+            if "[GTO]" in line:
+                line = next(f)
+                while "[" not in line:
+
+                    if len(line.split()) == 0:
+                        pass
+
+                    elif len(line.split()) == 1:
+                        atom = int(line.split()[0])
+
+                    elif len(line.split()) == 2:
+                        try:
+                            gtos[atom].append(line.rstrip())
+                        except KeyError:
+                            gtos[atom] = [ line.rstrip() ]
+
+                    line = next(f)
+
+            if "[MO]" in line:
+                line = next(f)
+                while len(line.split()) == 2:
+
+                    try:
+                        if "Sym" in line:
+                            orb = line.split()[-1][:-1]
+
+                        try:
+                            mos[orb].append(line.rstrip())
+                        except KeyError:
+                            mos[orb] = [ line.rstrip() ]
+
+                        line = next(f)
+
+                    except StopIteration:
+                        break
+
+    # Identify QM atoms: they have a non-zero charge
+    idxs = [ i for i, chg in enumerate(chgs) if float(chg) != 0 ]
+    chgs = [ chgs[i] for i in idxs ]
+    atoms = [ atoms[i] for i in idxs ]
+
+    # Correct atom numbering in atoms
+    new_atoms = []
+    for i, atom in enumerate(atoms, start=1):
+        old_lab = atom.split()[1]
+        n = len(old_lab)
+        rpad = str(i).rjust(n)
+        lpad = str(i).ljust(n)
+        new_atom = atom.replace(" %s " % old_lab, " %s " % rpad)
+        new_atom = new_atom.replace("%s " % old_lab, "%s " % lpad)
+        new_atoms.append(new_atom)
+
+    # Correct atom numbering in GTOs
+    newgtos = OrderedDict()
+    count = 1
+    for k, v in gtos.items():
+        newgtos[count] = v
+        count += 1
+
+    sections = { "[N_ATOMS]" : len(atoms), 
+                 "[ATOMS] (AU)" : new_atoms,
+                 "[CHARGE]" : chgs,
+                 "[GTO] (AU)": newgtos,
+                 "[MO]": mos }
+
+    if not ovw:
+        outname = write_molden_sections(sections, outname)
+        return outname
+
+    else:
+        if outname:
+            outname = write_molden_sections(sections, outname)
+            return outname
+        else:
+            outname = molden_file
+            return outname
+
+def write_molden_sections(sections, outname="new.molden"):
+
+    with open(outname, "w") as f:
+        f.write("[MOLDEN FORMAT]\n")
+
+        for k, v in sections.items():
+
+            f.write("%s\n" % k)
+            if isinstance(v, int):
+                f.write(20 * " " + "%s\n" % v)
+
+            elif isinstance(v, list):
+                for i in v:
+                    f.write("%s\n" % i)
+
+            elif isinstance(v, dict):
+                if "GTO" in k:
+                    for kk, vv in v.items():
+                        f.write("   %s\n" % kk)
+                        for i in vv:
+                            f.write("%s\n" % i)
+                        f.write("\n")
+
+                else:
+                    for kk, vv in v.items():
+                        for i in vv:
+                            f.write("%s\n" % i)
+
+    return outname
+
+if __name__ == "__main__":
+    mf = sys.argv[1]
+    out = sys.argv[2]
+    outname = correct_molden(mf, out, ovw=True)

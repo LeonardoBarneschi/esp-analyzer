@@ -1,0 +1,7 @@
+#!/usr/bin/python3
+# EASY-INSTALL-DEV-SCRIPT: 'grid-analyzer==0.1','grid_slicer'
+__requires__ = 'grid-analyzer==0.1'
+__import__('pkg_resources').require('grid-analyzer==0.1')
+__file__ = '/home/leonardo/Desktop/MyPackages/grid_analysis/grid_analysis/bin/grid_slicer'
+with open(__file__) as f:
+    exec(compile(f.read(), __file__, 'exec'))

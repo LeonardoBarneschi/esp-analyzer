@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+
+import argparse
+import numpy as np
+import os
+import pandas as pd
+import subprocess
+import sys
+
+from grid_analysis.grid_operations import fit_plane
+from grid_analysis.grid_operations import rot_plane
+from grid_analysis.grid_operations import projections
+from grid_analysis.file_operations import pqr_scraper
+from grid_analysis.grid_plots import esp_plot
+from grid_analysis.externals import multiwfn as mwfn
+from grid_analysis.geom_operations import vdw_surface
+from grid_analysis.geom_operations import molecular_linalg as ml
+
+def cli_parser(command_line = None):
+    '''
+    command line argument parser.
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--chg',dest='chg', type=str, help='name of the input PQR file', required=True)
+    parser.add_argument('-w', '--wfn',dest='wfn', type=str, help='name of the Multiwfn ESP file', required=False)
+    parser.add_argument('-p', '--pts',dest='pts', help='whether to include vdw surf  points', required=False, action='store_true')
+    parser.add_argument('-v', '--vrb',dest='vrb', help='activate output of intermediate file',required=False, action='store_true')
+    parser.add_argument('-png', '--png',dest='png', help='output name of png file',required=False, action='store_true')
+    args = parser.parse_args(command_line)
+    args = vars(parser.parse_args())
+    return args
+
+def grid_slicer(pqr, wfn, pts=False, vrb=False, png=None, out1=None, out2=None, out3=None, out4=None, out5=None):
+    '''
+    Plot a slice of electrostatic potential.
+
+    Given a file with ESP slice formatted as x, y, z, pot with x, y and z
+    being the grid point coordinate and pot the scalar associated to the
+    grid point, generate a contour plot of such potential. The plot may
+    incorporate a 2d projection of a molecule (chromophore) onto the slice.
+
+    Parameters
+    ----------
+    pqr : file, str, or os.PathLike
+        PQR file (standard format)
+
+    wfn : file, str, or os.PathLike
+        Communicator file for Multiwfn. Specifies the grid
+        points for ESP calculation. The first row specifies
+        the n. of grid points, the rest of the file is
+        formatted as x, y, z coordinates.
+
+    png : file, str, or os.PathLike
+        PathLike to which the PNG file is saved.
+
+    '''
+
+    # pi-plane through pi-atoms
+    eq = fit_plane.fit_piplane_driver(pqr)
+
+    # new-basis
+    v1, v2, v3, o = rot_plane.change_basis_driver(pqr)
+
+    # project heavy-atoms
+    llidx = int(pqr_scraper.find_pqr_linker_lys(pqr))
+    xr, yr, zr = pqr_scraper.extract_ret_pqr(pqr, llidx, heavy=True)
+
+    # output coords of projected atoms
+    projected = projections.project_atoms_onto_slice(xr, yr, zr, eq[0], eq[1], eq[2], eq[3], out1)
+
+    xr = np.array(xr)
+    yr = np.array(yr)
+    zr = np.array(zr)
+
+    # create the actual slice points
+    xdim, ydim, zdim = 10, 18, 8
+    #xdim, ydim, zdim = 10, 8, 18
+
+    slice_ = fit_plane.slice_grid(o, v1, v2, v3, xdim, ydim, zdim, out2, wfn)
+
+    # Multiwfn will use a file format with 3-columns only (x, y, z).
+    #xyzp = mwfn.calculate_esp(pqr, wfn, out3)
+    p, xyz = ml.coulomb_esp(pqr, surfile=wfn)
+    xyzp = np.c_[xyz, p]
+    #xyzp = np.loadtxt(xyzp, skiprows=1)
+
+    # This file format should be (x, y, z, pot)
+    esp_new, out4 = rot_plane.projecter(xyzp, (v1,v2,v3), mode='esp', out=out4)
+
+    #sys.exit()
+
+    if out1:
+        xyz_new = rot_plane.projecter(out1, (v1,v2,v3), mode='xyz', out=out5)
+        ax, fig, png = esp_plot.parse_and_plot(out4, png, xyz=out5, tex=True)
+    else:
+        ax, fig, png = esp_plot.parse_and_plot(out4, png, tex=True)
+
+    if pts:
+        # VdW surface projections
+        coords = np.array(pqr_scraper.extract_ret_pqr(pqr,llidx)).T
+        elem = ["C"]*len(coords)
+        b1, b2, b3=np.array([v1, v2, v3]).T
+        surf = vdw_surface.vdw_surface(coords, elem, 1, 200, vdw_surface.vdw_r)[0]
+        x, y, z = np.array(pqr_scraper.extract_ret_pi_pqr(pqr, llidx))
+        A, B, C, D = fit_plane.planefit_3d_points(x, y, z)
+        points = projections.surf_plane_intersection(A, B, C, D, surf)
+        proj = np.matrix(points)*np.matrix([b1,b2,b3])
+        pts = []
+        for i in proj:
+            pts.append([i[0,1], i[0,2]])
+            #pts.append([i[0,2], -i[0,1]])
+        pts = np.array(pts)
+        esp_plot.add_vdw_contour(pts, ax, fig, png='slice.png')
+
+    return
+
+if __name__ == "__main__":
+
+    args = cli_parser()
+    cwd = os.getcwd()
+    print(args)
+    chg, wfn, pts, vrb, png = args.values()
+
+    if vrb:
+        step1 = chg[:-4]+'_rot_basis_atoms.xyz'
+        step2 = chg[:-4]+'_rot_basis_slice.xyz'
+        step3 = chg[:-4]+'_rot_basis.esp'
+        step4 = chg[:-4]+'_car_basis.esp'
+        step5 = chg[:-4]+'_car_basis_atoms.xyz'
+        png   = chg[:-4]+'_car_basis.png'
+
+    else:
+        step1, step2, step3, step4, step5 = None, None, None, None, None
+
+    if not wfn:
+        wfn = chg[:-3]+'wfn'
+    if not png:
+        png = chg[:-4]+'_car_basis.png'
+
+    grid_slicer(chg, wfn, pts, vrb, png, step1, step2, step3, step4, step5)

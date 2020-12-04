@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import sys
+
+from grid_analysis.file_operations import tk2pqr
+from grid_analysis.file_operations import file_io
+from grid_analysis.geom_operations import molecular_linalg as ml
+from grid_analysis.externals import multiwfn
+
+def computephi(esp_pro_pla, esp_pro_tict, esp_ret_pla, esp_ret_tict):
+    '''
+    ESP is evaluated for:
+    1) Opsin at PLA geometry
+    2) Chromophore at PLA geometry
+    3) Opsin at TICT geometry
+    4) Chromophore at TICT geometry
+    '''
+
+    print(' -------------------------------------------------------------------')
+    print(' INPUT FILE CHECK')
+    print(' -------------------------------------------------------------------')
+    print(' esp_pro_pla  ---> {0} \n'.format(esp_pro_pla))
+    print(' esp_pro_tict ---> {0} \n'.format(esp_ret_pla))
+    print(' esp_ret_pla  ---> {0} \n'.format(esp_pro_tict))
+    print(' esp_ret_tict ---> {0} \n'.format(esp_ret_tict))
+    print(' -------------------------------------------------------------------')
+
+    # PLA (ESP opsin + ESP chromophore = 0)
+    data_pro_pla = np.loadtxt(esp_pro_pla, skiprows = 1)
+    data_pla     = np.loadtxt(esp_ret_pla, skiprows = 1)
+    gridpro_pla  = data_pro_pla[:,:-1]
+    esppro_pla   = data_pro_pla[:,-1]
+    gridpla      = data_pla[:,:-1]
+    esppla       = data_pla[:,-1]
+
+    # TICT (ESP opsin - ESP chromophore = 0)
+    data_pro_tict = np.loadtxt(esp_pro_tict, skiprows = 1)
+    data_tict     = np.loadtxt(esp_ret_tict, skiprows = 1)
+    gridpro_tict  = data_pro_tict[:,:-1]
+    esppro_tict   = data_pro_tict[:,-1]
+    gridtict      = data_tict[:,:-1]
+    esptict       = data_tict[:,-1]
+
+    # NORMALIZED DATA
+    NPLA = data_pro_pla.shape[0]
+    NTICT = data_pro_tict.shape[0]
+
+    #plot1 = esppro_pla + esppla
+    #plot2 = esppro_tict + esptict
+
+    #with open('pla_index.esp', 'w') as p1:
+    #    p1.write(str(plot1.shape[0])+'\n\n')
+    #    np.savetxt(p1, np.c_[gridpro_pla, plot1])
+
+    #with open('tict_index.esp', 'w') as p2:
+    #    p2.write(str(plot2.shape[0])+'\n\n')
+    #    np.savetxt(p2, np.c_[gridpro_tict, plot2])
+
+    #phi_pla  = np.sqrt((esppro_pla + esppla)**2)
+    #phi_tict = np.sqrt((esppro_tict - esptict)**2)
+    #phi      = phi_pla.sum()/NPLA - phi_tict.sum()/NTICT
+
+    # Old metric (no upper bound)
+    #phi_pla  = (np.abs(esppro_pla - esppla) / np.c_[np.abs(esppro_pla), np.abs(esppla)].max(axis=1)).mean()
+    #phi_tict = (np.abs(esppro_tict - esptict) / np.c_[np.abs(esppro_tict), np.abs(esptict)].max(axis=1)).mean()
+    #phi      = phi_pla - phi_tict
+
+    # New metric (-1 -> 1)
+    phi_pla = np.dot(esppro_pla, esppla) / (np.linalg.norm(esppro_pla)*np.linalg.norm(esppla))
+    phi_tict = np.dot(esppro_tict, esptict) / (np.linalg.norm(esppro_tict)*np.linalg.norm(esptict))
+    phi = phi_pla - phi_tict
+
+    # NOT NORMALIZED DATA
+    print(' -------------------------------------------------------------------')
+    print(' NOT NORMALIZED DATA')
+    print(' -------------------------------------------------------------------')
+    print(' Total Index             : {:.3f} \n'.format(phi))
+    print(' PLA  contribution       : {:.3f} \n'.format(phi_pla))
+    print(' TICT contribution       : {:.3f} \n'.format(phi_tict))
+    print(' Opsin ESP at PLA        : {:.3f} \n'.format(esppro_pla.sum()))
+    print(' Opsin ESP at TICT       : {:.3f} \n'.format(esppro_tict.sum()))
+    print(' Chromophore ESP at PLA  : {:.3f} \n'.format(esppla.sum()))
+    print(' Chromophore ESP at TICT : {:.3f} \n'.format(esptict.sum()))
+    print(' -------------------------------------------------------------------')
+
+    return phi
+
+if __name__ == "__main__":
+
+    density = 1
+
+    flag = sys.argv[1]
+
+    if flag == "-i":
+        oldpdb, oldxyz, plaxyz, tictxyz, outpla, outtict = sys.argv[2:]
+
+        pqr_pro_pla,  pqr_ret_pla_s1  = tk2pqr(oldpdb, oldxyz, plaxyz, outpla)
+        pqr_pro_tict, pqr_ret_tict_s1 = tk2pqr(oldpdb, oldxyz, tictxyz, outtict)
+
+        out_pro_pla = pqr_pro_pla[:-4]+'_pro_pla.esp'
+        Vprop, Cprop = ml.coulomb_esp(pqr_pro_pla, density, scale=1, mode=0)
+        ml.write_coulomb_esp(out_pro_pla, Vprop, Cprop)
+        #out_ret_pla = pqr_ret_pla_s1[:-4]+'_ret_pla.esp'
+        #Vretp, Cretp = ml.coulomb_esp(pqr_ret_pla_s1, density, scale=1,  mode=1)
+        #ml.write_coulomb_esp(out_ret_pla, Vretp, Cretp)
+
+        out_pro_tict = pqr_pro_tict[:-4]+'_pro_tict.esp'
+        Vprot, Cprot = ml.coulomb_esp(pqr_pro_tict, density, scale=1, mode=0)
+        ml.write_coulomb_esp(out_pro_tict, Vprot, Cprot)
+        #out_ret_tict = pqr_ret_tict_s1[:-4]+'_ret_tict.esp'
+        #Vrett, Crett = ml.coulomb_esp(pqr_ret_tict_s1, density, scale=1, mode=1)
+        #ml.write_coulomb_esp(out_ret_tict, Vrett, Crett)
+
+    elif flag == "-p":
+        out_pro_pla, out_pro_tict, out_ret_pla, out_ret_tict = sys.argv[2:]
+        computephi(out_pro_pla, out_pro_tict, out_ret_pla, out_ret_tict)

@@ -1,0 +1,78 @@
+
+ Charge check for input: ar2_-155.xyz --> -1.000
+
+ Charge check for state: S0 --> 1.000
+
+ Charge check for state: S1 --> 1.000
+
+ Charge check for input: ar2_-98.xyz --> -1.000
+
+ Charge check for state: S0 --> 1.000
+
+ Charge check for state: S1 --> 1.000
+Chromophore PLA S1 :  ar2_-155_s1.pqr
+Protein PLA        :  ar2_-155_new.pqr
+MDA RADII:  [ 1.908  1.875  1.100  1.100  0.600  1.870  1.870  1.870  1.870  1.870
+  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870
+  1.870  1.870  1.870  1.870  1.870  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016]
+MDA ATOMS:  ['C' 'N' 'H' 'H' 'H' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C'
+ 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H'
+ 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H']
+MDA RADII:  [ 1.908  1.875  1.100  1.100  0.600  1.870  1.870  1.870  1.870  1.870
+  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870  1.870
+  1.870  1.870  1.870  1.870  1.870  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016  0.016
+  0.016  0.016  0.016]
+MDA ATOMS:  ['C' 'N' 'H' 'H' 'H' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'C'
+ 'C' 'C' 'C' 'C' 'C' 'C' 'C' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H'
+ 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H']
+
+ The file ar2_-98_new.dat, already exists. 
+
+
+
+ NOT NORMALIZED DATA
+ -------------------------------------------------------------------
+ Total Index             : -177.598 
+
+ PLA  contribution       : -19.313 
+
+ TICT contribution       : -158.285 
+
+ Opsin ESP at PLA        : -133.338 
+
+ Opsin ESP at TICT       : -129.533 
+
+ Chromophore ESP at PLA  : 114.025 
+
+ Chromophore ESP at TICT : 28.752 
+
+ -------------------------------------------------------------------
+
+
+ NORMALIZED DATA
+ -------------------------------------------------------------------
+ PLA index was normalized by a coefficient : 1803 
+
+ TICT index was normalized by a coefficient: 1810 
+
+
+ Total Index             : -0.048 
+
+ PLA  contribution       : 0.065 
+
+ TICT contribution       : 0.113 
+
+ Opsin ESP at PLA        : -0.074 
+
+ Opsin ESP at TICT       : -0.072 
+
+ Chromophore ESP at PLA  : 0.063 
+
+ Chromophore ESP at TICT : 0.016 
+
+ -------------------------------------------------------------------

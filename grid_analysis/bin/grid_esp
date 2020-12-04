@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+
+import argparse
+import numpy as np
+import os
+import pandas as pd
+import subprocess
+import sys
+
+from grid_analysis import templates
+from grid_analysis.file_operations import pqr_scraper
+from grid_analysis.file_operations import tk2pqr
+from grid_analysis.geom_operations import molecular_linalg as ml
+from grid_analysis.grid_operations import cub2xyz2cub
+from grid_analysis.templates import vmd_render_surf
+from grid_analysis.externals import multiwfn
+
+def esp_surf_graphics(oldpdb, oldxyz, plaxyz, tctxyz, outpla, outtct, retorb):
+    """
+    The program first generates a pdb->xyz coordinate map (fortran).
+    This is used to create a pqr file, where the vdw radii are taken
+    from the Tinker FF file and charges assigned are taken (i) from the
+    same file if the calculation of Opsin ESP is required or (ii) from a
+    different source (i.e. output of a quantum chemistry program) if the
+    chromophore ESP calculation is desired instead.
+    """
+
+    pqr_pro_pla, pqr_ret_pla = tk2pqr(oldpdb, oldxyz, plaxyz, outpla)
+    pqr_pro_tct, pqr_ret_tct = tk2pqr(oldpdb, oldxyz, tctxyz, outtct)
+
+    plaret = pqr_scraper.chromophorepqr(pqr_ret_pla, heavy=True)
+    tctret = pqr_scraper.chromophorepqr(pqr_ret_tct, heavy=True)
+
+    # avc = atomic coulomb potential contribution
+    # vc  = coulomb interaction potential 
+    pla_avc, pla_vc, plaele = ml.coulinteract(pqr_pro_pla, pqr_ret_pla)
+    tct_avc, tct_vc, tctele = ml.coulinteract(pqr_pro_tct, pqr_ret_tct)
+
+    with open('pla_interaction.csv', 'w') as i:
+        np.savetxt(i, plaele.reshape(1,-1), fmt="%s", delimiter=',')
+        np.savetxt(i, np.r_[pla_avc, pla_vc].reshape(1,-1), fmt="%6.3f", delimiter=',')
+
+    with open('tict_interaction.csv', 'w') as i:
+        np.savetxt(i, tctele.reshape(1,-1), fmt="%s", delimiter=',')
+        np.savetxt(i, np.r_[tct_avc, tct_vc].reshape(1,-1), fmt="%6.3f", delimiter=',')
+
+    retpla = 'plaret.pqr'
+    rettct = 'tctret.pqr'
+
+    #with open(retpla, 'w') as p:
+    #    p.writelines(plaret)
+
+    #with open(rettct, 'w') as p:
+    #    p.writelines(tctret)
+
+    cub = multiwfn.edens2cub(retorb)
+
+    cube, data, _ = cub2xyz2cub.read_cube(cub)
+
+    # Coulombic Interaction Potential
+    #
+    cubeproplaesp = cub2xyz2cub.espcub(cube, data, pqr_pro_pla, mode=0, out=cub[:-3] + "pla_pro.cub")
+    cuberetplaesp = cub2xyz2cub.espcub(cube, data, pqr_ret_pla, mode=1, out=cub[:-3] + "pla_ret.cub")
+    cubeprotctesp = cub2xyz2cub.espcub(cube, data, pqr_pro_tct, mode=0, out=cub[:-3] + "tct_pro.cub")
+    cuberettctesp = cub2xyz2cub.espcub(cube, data, pqr_ret_tct, mode=1, out=cub[:-3] + "tct_ret.cub")
+
+    dxproplaesp = cubeproplaesp[:-3] + "dx"
+    dxretplaesp = cuberetplaesp[:-3] + "dx"
+    dxprotctesp = cubeprotctesp[:-3] + "dx"
+    dxrettctesp = cuberettctesp[:-3] + "dx"
+
+    # Cube to DX conversion
+    try:
+        cmd1 = "obabel -icub {0} -odx > {1}".format(cubeproplaesp, dxproplaesp)
+        cmd2 = "obabel -icub {0} -odx > {1}".format(cuberetplaesp, dxretplaesp)
+        cmd3 = "obabel -icub {0} -odx > {1}".format(cubeprotctesp, dxprotctesp)
+        cmd4 = "obabel -icub {0} -odx > {1}".format(cuberettctesp, dxrettctesp)
+
+        subprocess.run([cmd1], shell=True, capture_output=True)
+        subprocess.run([cmd2], shell=True, capture_output=True)
+        subprocess.run([cmd3], shell=True, capture_output=True)
+        subprocess.run([cmd4], shell=True, capture_output=True)
+
+    except FileNotFoundError:
+        sys.exit()
+
+
+    templatepath = os.path.dirname(templates.__file__)
+    templatesurf = os.path.join(templatepath, 'surfrender.j2')
+    templatechrm = os.path.join(templatepath, 'pqrchromophore.j2')
+
+    # VMD rendering
+    vmdtemp1 = vmd_render_surf.vmdsurfrender(templatesurf, retpla, dxproplaesp, '{0}.vmd'.format(dxproplaesp[:-3]))
+    vmdtemp2 = vmd_render_surf.vmdsurfrender(templatesurf, retpla, dxretplaesp, '{0}.vmd'.format(dxretplaesp[:-3]))
+    vmdtemp3 = vmd_render_surf.vmdsurfrender(templatesurf, rettct, dxprotctesp, '{0}.vmd'.format(dxprotctesp[:-3]))
+    vmdtemp4 = vmd_render_surf.vmdsurfrender(templatesurf, rettct, dxrettctesp, '{0}.vmd'.format(dxrettctesp[:-3]))
+    vmdtemp5 = vmd_render_surf.vmdchrmrender(templatechrm, retpla, '{0}.vmd'.format(retpla[:-4]))
+    vmdtemp6 = vmd_render_surf.vmdchrmrender(templatechrm, rettct, '{0}.vmd'.format(rettct[:-4]))
+
+    # TODO: Catch VMD not installed exception
+    # Scene setup and rendering by VMD
+    try:
+        cmd1 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp1)
+        cmd2 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp2)
+        cmd3 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp3)
+        cmd4 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp4)
+        cmd5 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp5)
+        cmd6 = "vmd -e {0} -dispdev -size 600 600".format(vmdtemp6)
+
+        subprocess.run([cmd1], shell=True, capture_output=True)
+        subprocess.run([cmd2], shell=True, capture_output=True)
+        subprocess.run([cmd3], shell=True, capture_output=True)
+        subprocess.run([cmd4], shell=True, capture_output=True)
+        subprocess.run([cmd5], shell=True, capture_output=True)
+        subprocess.run([cmd6], shell=True, capture_output=True)
+
+    except FileNotFoundError:
+        sys.exit()
+
+    try:
+        cmd1 = "mogrify -format png *.tga -density 600 -quality 100"
+        cmd2 = "mogrify -transparent black *.png *.png"
+        cmd3 = "mogrify -resize 1200x1200 *.png -density 100"
+        cmd4 = "mogrify -trim *.png"
+        subprocess.run([cmd1], shell=True, capture_output=True)
+        subprocess.run([cmd2], shell=True, capture_output=True)
+        subprocess.run([cmd3], shell=True, capture_output=True)
+        subprocess.run([cmd4], shell=True, capture_output=True)
+    except FileNotFoundError:
+        sys.exit()
+
+    os.remove(cub)
+    os.remove(cubeproplaesp)
+    os.remove(cuberetplaesp)
+    os.remove(cubeprotctesp)
+    os.remove(cuberettctesp)
+    #os.remove(vmdtemp1)
+    #os.remove(vmdtemp2)
+    #os.remove(vmdtemp3)
+    #os.remove(vmdtemp4)
+    #os.remove(vmdtemp5)
+    #os.remove(vmdtemp6)
+
+    return
+
+
+if __name__ == "__main__":
+
+    oldpdb, oldxyz, plaxyz, tictxyz, outpla, outtict, retorb = sys.argv[1:]
+    esp_surf_graphics(oldpdb, oldxyz, plaxyz, tictxyz, outpla, outtict, retorb)
