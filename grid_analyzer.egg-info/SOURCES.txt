@@ -10,6 +10,7 @@ grid_analysis/externals/multiwfn.py
 grid_analysis/file_operations/__init__.py
 grid_analysis/file_operations/arm_fix_molden.py
 grid_analysis/file_operations/file_io.py
+grid_analysis/file_operations/getmap.f90
 grid_analysis/file_operations/parse_molcas.py
 grid_analysis/file_operations/pqr_scraper.py
 grid_analysis/file_operations/renumber.py
@@ -17,6 +18,10 @@ grid_analysis/file_operations/tk2pqr.py
 grid_analysis/file_operations/tk2pqr_map.py
 grid_analysis/file_operations/tkff2dict.py
 grid_analysis/geom_operations/__init__.py
+grid_analysis/geom_operations/getcoulene.f90
+grid_analysis/geom_operations/getcoulene_parallel.f90
+grid_analysis/geom_operations/getpot.f90
+grid_analysis/geom_operations/getpot_parallel.f90
 grid_analysis/geom_operations/molecular_linalg.py
 grid_analysis/geom_operations/test.py
 grid_analysis/geom_operations/vdw_surface.py

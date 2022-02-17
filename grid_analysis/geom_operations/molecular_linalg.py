@@ -151,12 +151,76 @@ def write_coulomb_esp(out, V, S, ovw=False):
 
     return out
 
+def esp_split(pqr, chromophore="RET"):
+
+    idx = pqr_scraper.find_pqr_linker_lys(pqr)
+    u = mda.Universe(pqr)
+    prosel = u.select_atoms("all and not ((resname %s) or (name CE HE1 HE2 NZ HZ and resid %s))" % (chromophore, idx))
+    retsel = u.select_atoms("resname %s and name C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 or (name NZ and resid %s)" % (chromophore, idx))
+    lh = u.select_atoms("resname %s and name C5 C6 C7 C8 C9 C10" % chromophore).center_of_geometry()
+    rh = u.select_atoms("resname %s and name C11 C12 C13 C14 C15 or (name NZ and resid %s)" % (chromophore, idx)).center_of_geometry()
+    coords = prosel.positions
+    qp = prosel.charges
+    Vp = getpot_parallel.getpot(coords, qp, np.array([lh, rh]))
+    return Vp
+
+def groesp_at_ret(pqr, chromophore="RET"):
+
+    idx = 226
+    u = mda.Universe(pqr)
+    prosel = u.select_atoms(f"all and not (resname {chromophore} and not (name N C CA CB CG CD O H HA HB HB1 HB2 HG1 HG2 HD1 HD2))") 
+    retsel = u.select_atoms("resname %s and name C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 CT1 CT2 CT3 CT4 CT5 or (name NZ CE and resid %s)" % (chromophore, idx))
+    print(len(prosel))
+    print(prosel.charges.sum())
+    coords = prosel.positions
+    qp = prosel.charges
+    Vp = getpot_parallel.getpot(coords, qp, retsel.positions)
+    return Vp
+
+def esp_at_ret(pqr, chromophore="RET"):
+
+    idx = pqr_scraper.find_pqr_linker_lys(pqr)
+    print(idx)
+    u = mda.Universe(pqr)
+    prosel = u.select_atoms("all and not ((resname %s) or (name CE HE1 HE2 NZ HZ and resid %s))" % (chromophore, idx))
+    retsel = u.select_atoms("resname %s and name C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 CT1 CT2 CT3 CT4 CT5 or (name NZ CE and resid %s)" % (chromophore, idx))
+    #retsel = u.select_atoms("resname %s and name C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 or (name NZ and resid %s)" % (chromophore, idx))
+    coords = prosel.positions
+    qp = prosel.charges
+    Vp = getpot_parallel.getpot(coords, qp, retsel.positions)
+    return Vp
+
+def esp_at_ret_2(pqr, chromophore="RET"):
+
+    u = mda.Universe(pqr)
+    prosel = u.select_atoms("all and not ((resname %s) or (name CE HE1 HE2 NZ HZ and resname %s))" % (chromophore, chromophore))
+    retsel = u.select_atoms("resname %s and name C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 NZ" % chromophore)
+    coords = prosel.positions
+    qp = prosel.charges
+    Vp = getpot_parallel.getpot(coords, qp, retsel.positions)
+    return Vp
+
+def esp_at_ret_3(pdb, pqr, chromophore="RET"):
+
+    a = mda.Universe(pdb)
+    u = mda.Universe(pqr)
+    prosel = u.select_atoms("all and not (name C1 C2 H21 H22 C3 H31 H32 C4 H41 H42 C5 C6 C7 H7 C8 H8 C9 C10 H10 C11 H11 C12 H12 C13 C14 H14 C15 H15 CT1 HT11 HT12 HT13 CT2 HT21 HT22 HT23 CT3 HT31 HT32 HT33 CT4 HT41 HT42 HT43 CT5 HT51 HT52 HT53 NZ HZ and resname %s)" % chromophore)
+    retsel = a.select_atoms("name C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 CT1 CT2 CT3 CT4 CT5 NZ CE and resname %s" % chromophore)
+    coords = prosel.positions
+    qp = prosel.charges
+    Vp = getpot_parallel.getpot(coords, qp, retsel.positions)
+    return Vp
+
 if __name__ == "__main__":
 
-    pqr = sys.argv[1]
-    out = sys.argv[2]
-    mod = sys.argv[3]
-    V, XYZ = coulomb_esp(pqr, 5, mod)
-    with open(out,'w') as o:
-        o.write(str(V.shape[0])+'\n')
-        np.savetxt(o, np.c_[XYZ, V], fmt="%10.6f")
+    pdb = sys.argv[1]
+    pqr = sys.argv[2]
+    print(esp_at_ret_3(pdb, pqr))
+
+    ### pqr = sys.argv[1]
+    ### out = sys.argv[2]
+    ### mod = sys.argv[3]
+    ### V, XYZ = coulomb_esp(pqr, 5, mod)
+    ### with open(out,'w') as o:
+    ###     o.write(str(V.shape[0])+'\n')
+    ###     np.savetxt(o, np.c_[XYZ, V], fmt="%10.6f")
